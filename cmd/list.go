@@ -3,11 +3,14 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
 var cmdList = &cobra.Command{
@@ -37,74 +40,87 @@ across each workload's replicas, from metrics-server.`,
 		outputFormat, _ := fs.GetString("output")
 		withUsage, _ := fs.GetBool("with-usage")
 
-		pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
-		if err != nil {
-			log.Fatalln(err)
-		}
-
-		var podMetrics map[string]map[string]podContainerUsage
+		var metricsClient metricsv.Interface
 		if withUsage {
-			metricsClient, mErr := NewMetricsClientLocal()
+			mc, mErr := NewMetricsClientLocal()
 			if mErr != nil {
 				fmt.Fprintln(os.Stderr, "warning: could not create metrics client, continuing without usage data:", mErr)
-			} else if pm, fErr := fetchPodMetrics(ctx, metricsClient, namespace); fErr != nil {
-				fmt.Fprintln(os.Stderr, "warning: metrics-server unavailable, continuing without usage data:", fErr)
 			} else {
-				podMetrics = pm
+				metricsClient = mc
 			}
 		}
 
-		var rows []ResourceRow
-		collectors := []func() ([]ResourceRow, error){
-			func() ([]ResourceRow, error) {
-				return collectDeployments(ctx, clientset, namespace, pods.Items, podMetrics)
-			},
-			func() ([]ResourceRow, error) {
-				return collectStatefulSets(ctx, clientset, namespace, pods.Items, podMetrics)
-			},
-			func() ([]ResourceRow, error) {
-				return collectDaemonSets(ctx, clientset, namespace, pods.Items, podMetrics)
-			},
-			func() ([]ResourceRow, error) {
-				return collectReplicaSets(ctx, clientset, namespace, pods.Items, podMetrics)
-			},
-			func() ([]ResourceRow, error) {
-				return collectJobs(ctx, clientset, namespace, pods.Items, podMetrics)
-			},
-			func() ([]ResourceRow, error) {
-				return collectCronJobs(ctx, clientset, namespace)
-			},
-		}
-		for _, collect := range collectors {
-			r, err := collect()
-			if err != nil {
-				log.Fatalln(err)
-			}
-			rows = append(rows, r...)
-		}
-		rows = append(rows, collectBarePods(pods.Items, podMetrics)...)
-
-		totals := computeTotals(rows)
-
-		switch outputFormat {
-		case "table", "":
-			renderTable(os.Stdout, rows, totals, withUsage)
-		case "json":
-			if err := renderJSON(os.Stdout, rows, totals); err != nil {
-				log.Fatalln(err)
-			}
-		case "yaml":
-			if err := renderYAML(os.Stdout, rows, totals); err != nil {
-				log.Fatalln(err)
-			}
-		case "csv":
-			if err := renderCSV(os.Stdout, rows, withUsage); err != nil {
-				log.Fatalln(err)
-			}
-		default:
-			log.Fatalf("unsupported output format %q (want table, json, yaml, or csv)", outputFormat)
+		if err := runList(ctx, clientset, metricsClient, namespace, outputFormat, withUsage, os.Stdout); err != nil {
+			log.Fatalln(err)
 		}
 	},
+}
+
+// runList holds everything after client/flag setup: collecting rows from
+// every workload kind, optionally augmenting with metrics-server usage,
+// computing totals, and rendering. Split out from cmdList.Run so it can be
+// exercised with fake/injected clients instead of a real cluster.
+func runList(ctx context.Context, clientset kubernetes.Interface, metricsClient metricsv.Interface, namespace, outputFormat string, withUsage bool, w io.Writer) error {
+	pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	var podMetrics map[string]map[string]podContainerUsage
+	if withUsage && metricsClient != nil {
+		pm, fErr := fetchPodMetrics(ctx, metricsClient, namespace)
+		if fErr != nil {
+			fmt.Fprintln(os.Stderr, "warning: metrics-server unavailable, continuing without usage data:", fErr)
+		} else {
+			podMetrics = pm
+		}
+	}
+
+	var rows []ResourceRow
+	collectors := []func() ([]ResourceRow, error){
+		func() ([]ResourceRow, error) {
+			return collectDeployments(ctx, clientset, namespace, pods.Items, podMetrics)
+		},
+		func() ([]ResourceRow, error) {
+			return collectStatefulSets(ctx, clientset, namespace, pods.Items, podMetrics)
+		},
+		func() ([]ResourceRow, error) {
+			return collectDaemonSets(ctx, clientset, namespace, pods.Items, podMetrics)
+		},
+		func() ([]ResourceRow, error) {
+			return collectReplicaSets(ctx, clientset, namespace, pods.Items, podMetrics)
+		},
+		func() ([]ResourceRow, error) {
+			return collectJobs(ctx, clientset, namespace, pods.Items, podMetrics)
+		},
+		func() ([]ResourceRow, error) {
+			return collectCronJobs(ctx, clientset, namespace)
+		},
+	}
+	for _, collect := range collectors {
+		r, err := collect()
+		if err != nil {
+			return err
+		}
+		rows = append(rows, r...)
+	}
+	rows = append(rows, collectBarePods(pods.Items, podMetrics)...)
+
+	totals := computeTotals(rows)
+
+	switch outputFormat {
+	case "table", "":
+		renderTable(w, rows, totals, withUsage)
+		return nil
+	case "json":
+		return renderJSON(w, rows, totals)
+	case "yaml":
+		return renderYAML(w, rows, totals)
+	case "csv":
+		return renderCSV(w, rows, withUsage)
+	default:
+		return fmt.Errorf("unsupported output format %q (want table, json, yaml, or csv)", outputFormat)
+	}
 }
 
 func init() {
