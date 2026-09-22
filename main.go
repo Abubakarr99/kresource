@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"resource/cmd"
+	"github.com/Abubakarr99/kresource/cmd"
 )
 
 func main() {

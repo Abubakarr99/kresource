@@ -9,19 +9,24 @@ since those aren't the same thing.
 ## Installation
 
 ```shell
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/Abubakarr99/kresource/main/install.sh | bash
 ```
 
-Builds for your platform and installs `kubectl-resource` onto your `PATH`.
-Prefers a directory you already own (`~/.local/bin` or `~/bin` if either is on
-`PATH`) over `/usr/local/bin`, so it only asks for `sudo` when it actually
-needs it. Override the destination with `INSTALL_DIR`:
+Runs `go install` for your platform (no local clone needed) and installs
+`kubectl-resource` onto your `PATH`. Prefers a directory you already own
+(`~/.local/bin` or `~/bin` if either is on `PATH`) over `/usr/local/bin`, so it
+only asks for `sudo` when it actually needs to. Requires a Go toolchain.
+
+Override the install directory or version with env vars:
 
 ```shell
-INSTALL_DIR=$HOME/bin ./install.sh
+INSTALL_DIR=$HOME/bin curl -fsSL https://raw.githubusercontent.com/Abubakarr99/kresource/main/install.sh | bash
+VERSION=v0.2.0 curl -fsSL https://raw.githubusercontent.com/Abubakarr99/kresource/main/install.sh | bash
 ```
 
-`make install` still works too, and always installs to `/usr/local/bin` via `sudo`.
+If you already have the repo cloned, `./install.sh` works the same way (it
+always installs via `go install`, not your local working tree — for that,
+use `make build`/`make install` instead, which builds what's actually on disk).
 
 ## Usage
 
