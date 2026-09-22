@@ -9,8 +9,19 @@ since those aren't the same thing.
 ## Installation
 
 ```shell
-make install
+./install.sh
 ```
+
+Builds for your platform and installs `kubectl-resource` onto your `PATH`.
+Prefers a directory you already own (`~/.local/bin` or `~/bin` if either is on
+`PATH`) over `/usr/local/bin`, so it only asks for `sudo` when it actually
+needs it. Override the destination with `INSTALL_DIR`:
+
+```shell
+INSTALL_DIR=$HOME/bin ./install.sh
+```
+
+`make install` still works too, and always installs to `/usr/local/bin` via `sudo`.
 
 ## Usage
 
