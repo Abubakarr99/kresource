@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+MODULE="github.com/Abubakarr99/kresource"
 BINARY_NAME="kubectl-resource"
+VERSION="${VERSION:-latest}"
 
 if ! command -v go >/dev/null 2>&1; then
   echo "error: go is not installed or not on PATH." >&2
@@ -9,15 +11,18 @@ if ! command -v go >/dev/null 2>&1; then
   exit 1
 fi
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "${script_dir}"
+# `go install` names the binary after the module's own last path element
+# (kresource), not this plugin's kubectl-resource naming convention, so it's
+# installed to a scratch GOBIN first and renamed into place below.
+tmp_gobin="$(mktemp -d)"
+trap 'rm -rf "${tmp_gobin}"' EXIT
 
-echo "==> Building ${BINARY_NAME} ($(go env GOOS)/$(go env GOARCH))"
-go build -o "${BINARY_NAME}" .
+echo "==> Installing ${MODULE}@${VERSION} ($(go env GOOS)/$(go env GOARCH))"
+GOBIN="${tmp_gobin}" go install "${MODULE}@${VERSION}"
 
-# Prefer a directory the user can already write to over /usr/local/bin, so a
-# plain ./install.sh doesn't demand sudo on machines where ~/.local/bin (or
-# an equivalent user bin dir) is already on PATH.
+# Prefer a directory the user can already write to over /usr/local/bin, so
+# this doesn't demand sudo on machines where ~/.local/bin (or an equivalent
+# user bin dir) is already on PATH.
 resolve_install_dir() {
   if [ -n "${INSTALL_DIR:-}" ]; then
     printf '%s\n' "${INSTALL_DIR}"
@@ -35,10 +40,10 @@ mkdir -p "${install_dir}" 2>/dev/null || true
 
 echo "==> Installing to ${install_dir}/${BINARY_NAME}"
 if [ -w "${install_dir}" ]; then
-  mv "${BINARY_NAME}" "${install_dir}/${BINARY_NAME}"
+  mv "${tmp_gobin}/kresource" "${install_dir}/${BINARY_NAME}"
 else
   echo "==> ${install_dir} isn't writable, using sudo"
-  sudo mv "${BINARY_NAME}" "${install_dir}/${BINARY_NAME}"
+  sudo mv "${tmp_gobin}/kresource" "${install_dir}/${BINARY_NAME}"
 fi
 chmod +x "${install_dir}/${BINARY_NAME}"
 
