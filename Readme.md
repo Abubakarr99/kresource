@@ -9,7 +9,7 @@ since those aren't the same thing.
 ## Installation
 
 ```shell
-curl -fsSL https://raw.githubusercontent.com/Abubakarr99/kresource/main/install.sh | bash
+VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/Abubakarr99/kresource/main/install.sh | bash
 ```
 
 Runs `go install` for your platform (no local clone needed) and installs
@@ -17,11 +17,15 @@ Runs `go install` for your platform (no local clone needed) and installs
 (`~/.local/bin` or `~/bin` if either is on `PATH`) over `/usr/local/bin`, so it
 only asks for `sudo` when it actually needs to. Requires a Go toolchain.
 
-Override the install directory or version with env vars:
+`VERSION` defaults to `latest` if omitted, which will track new tags going
+forward — pin it explicitly right after cutting a release, though: the Go
+module proxy caches `@latest` for untagged/newly-tagged modules with a TTL
+outside anyone's control, so it can lag behind the newest tag for a while.
+
+Override the install directory too if you'd like:
 
 ```shell
-INSTALL_DIR=$HOME/bin curl -fsSL https://raw.githubusercontent.com/Abubakarr99/kresource/main/install.sh | bash
-VERSION=v0.2.0 curl -fsSL https://raw.githubusercontent.com/Abubakarr99/kresource/main/install.sh | bash
+INSTALL_DIR=$HOME/bin VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/Abubakarr99/kresource/main/install.sh | bash
 ```
 
 If you already have the repo cloned, `./install.sh` works the same way (it
