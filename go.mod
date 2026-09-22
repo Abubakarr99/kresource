@@ -1,4 +1,4 @@
-module resource
+module github.com/Abubakarr99/kresource
 
 go 1.23.0
 
