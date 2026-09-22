@@ -9,7 +9,7 @@ since those aren't the same thing.
 ## Installation
 
 ```shell
-VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/Abubakarr99/kresource/main/install.sh | bash
+VERSION=v0.2.0 curl -fsSL https://raw.githubusercontent.com/Abubakarr99/kresource/main/install.sh | bash
 ```
 
 Runs `go install` for your platform (no local clone needed) and installs
@@ -25,7 +25,7 @@ outside anyone's control, so it can lag behind the newest tag for a while.
 Override the install directory too if you'd like:
 
 ```shell
-INSTALL_DIR=$HOME/bin VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/Abubakarr99/kresource/main/install.sh | bash
+INSTALL_DIR=$HOME/bin VERSION=v0.2.0 curl -fsSL https://raw.githubusercontent.com/Abubakarr99/kresource/main/install.sh | bash
 ```
 
 If you already have the repo cloned, `./install.sh` works the same way (it
