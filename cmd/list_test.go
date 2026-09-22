@@ -50,7 +50,7 @@ func TestRunListEndToEnd(t *testing.T) {
 	)
 
 	var buf bytes.Buffer
-	if err := runList(ctx, cs, nil, "ns", "table", false, &buf); err != nil {
+	if err := runList(ctx, cs, nil, listOptions{Namespace: "ns", OutputFormat: "table"}, &buf); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
@@ -66,7 +66,7 @@ func TestRunListEndToEnd(t *testing.T) {
 	}
 
 	buf.Reset()
-	if err := runList(ctx, cs, nil, "ns", "json", false, &buf); err != nil {
+	if err := runList(ctx, cs, nil, listOptions{Namespace: "ns", OutputFormat: "json"}, &buf); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(buf.String(), `"kind": "CronJob"`) {
@@ -78,8 +78,66 @@ func TestRunListUnsupportedFormat(t *testing.T) {
 	ctx := context.Background()
 	cs := fake.NewSimpleClientset()
 	var buf bytes.Buffer
-	err := runList(ctx, cs, nil, "ns", "xml", false, &buf)
+	err := runList(ctx, cs, nil, listOptions{Namespace: "ns", OutputFormat: "xml"}, &buf)
 	if err == nil {
 		t.Fatal("expected an error for an unsupported output format")
+	}
+}
+
+func TestRunListFilterAndSort(t *testing.T) {
+	ctx := context.Background()
+	cs := fake.NewSimpleClientset(
+		&appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{Name: "web", Namespace: "ns"},
+			Spec: appsv1.DeploymentSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "web"}},
+					Spec:       podSpecWithContainer("app", mustReq("50m", "32Mi")),
+				},
+			},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "bare-small", Namespace: "ns"},
+			Spec:       podSpecWithContainer("app", mustReq("5m", "8Mi")),
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "bare-big", Namespace: "ns"},
+			Spec:       podSpecWithContainer("app", mustReq("500m", "512Mi")),
+		},
+	)
+
+	var buf bytes.Buffer
+	if err := runList(ctx, cs, nil, listOptions{Namespace: "ns", OutputFormat: "table", Filter: "type=deployment"}, &buf); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "web") || strings.Contains(out, "bare-") {
+		t.Fatalf("expected --filter type=deployment to keep only the Deployment row, got:\n%s", out)
+	}
+
+	buf.Reset()
+	if err := runList(ctx, cs, nil, listOptions{Namespace: "ns", OutputFormat: "csv", Filter: "type=Pod", SortBy: "memory-request", Reverse: true}, &buf); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected header + 2 pod rows, got %d lines:\n%s", len(lines), buf.String())
+	}
+	if !strings.HasPrefix(lines[1], "Pod,bare-big,") || !strings.HasPrefix(lines[2], "Pod,bare-small,") {
+		t.Fatalf("expected reverse memory-request sort to put bare-big before bare-small, got:\n%s", buf.String())
+	}
+}
+
+func TestRunListInvalidFilterAndSort(t *testing.T) {
+	ctx := context.Background()
+	cs := fake.NewSimpleClientset()
+	var buf bytes.Buffer
+
+	if err := runList(ctx, cs, nil, listOptions{Namespace: "ns", OutputFormat: "table", Filter: "bogus=x"}, &buf); err == nil {
+		t.Fatal("expected an error for an unknown --filter key")
+	}
+	if err := runList(ctx, cs, nil, listOptions{Namespace: "ns", OutputFormat: "table", SortBy: "bogus"}, &buf); err == nil {
+		t.Fatal("expected an error for an unknown --sort-by key")
 	}
 }

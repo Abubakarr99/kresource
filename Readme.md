@@ -40,11 +40,23 @@ kubectl resource list -n <namespace>      ## a specific namespace
 kubectl resource list -o json             ## json | yaml | csv | table (default)
 kubectl resource list --with-usage        ## add actual CPU/Mem usage from metrics-server,
                                            ## averaged per replica across each workload's pods
+kubectl resource list --filter type=deployment            ## only Deployment rows
+kubectl resource list --filter name=web,container=app     ## substring match on name and container
+kubectl resource list --sort-by memory-limit --reverse    ## biggest memory limit first
 ```
 
 `--with-usage` requires [metrics-server](https://github.com/kubernetes-sigs/metrics-server)
 to be installed in the cluster. If it isn't reachable, the command warns on
 stderr and falls back to showing requests/limits only.
+
+`--filter` takes a comma-separated `key=value` list (AND across keys):
+`type` (exact, case-insensitive), `name`/`container` (substring, case-insensitive),
+`init` (`true`/`false`). Filtering happens before the `TOTAL` row is computed,
+so totals reflect only what's shown.
+
+`--sort-by` takes one of `kind`, `name`, `container`, `cpu-request`,
+`memory-request`, `cpu-limit`, `memory-limit`, `actual-cpu`, `actual-memory`.
+Sorting is ascending and stable by default; add `--reverse` for descending.
 
 A `TOTAL` row/field sums requests and limits across all listed containers.
 Limit totals only include containers that actually set a limit; the count of
