@@ -62,3 +62,7 @@ A `TOTAL` row/field sums requests and limits across all listed containers.
 Limit totals only include containers that actually set a limit; the count of
 containers left unbounded is called out separately (e.g. `200m (+1 unbounded)`)
 rather than silently treating "no limit" as `0`.
+
+## License
+
+[MIT](LICENSE)
